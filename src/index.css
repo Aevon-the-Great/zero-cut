@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-black: #000000;
+  --color-brand-white: #FFFFFF;
+  --color-brand-gray-light: #E5E5E5;
+  --color-brand-gray-muted: #A0A0A0;
+  
+  --radius-subtle: 8px;
+  
+  --font-sans: "Inter", "system-ui", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-black text-brand-white antialiased font-sans;
+  }
+}
+
+/* Custom styles for Solana Wallet Adapter buttons to match the aesthetic */
+.wallet-adapter-button {
+  @apply !bg-brand-white !text-brand-black !font-sans !font-bold !rounded-subtle !transition-all !duration-200 !text-sm !px-4 !h-10;
+}
+
+.wallet-adapter-button:hover {
+  @apply !bg-brand-gray-light;
+}
+
+.wallet-adapter-button-trigger {
+  @apply !bg-brand-white !text-brand-black;
+}
