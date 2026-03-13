@@ -1,6 +1,20 @@
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, AlertCircle, ShoppingCart } from 'lucide-react';
+import { Loader2, AlertCircle, ShoppingCart, CheckCircle2, Download } from 'lucide-react';
+import { useState } from 'react';
+import { 
+    PublicKey, 
+    Transaction, 
+    SystemProgram, 
+    LAMPORTS_PER_SOL 
+} from '@solana/web3.js';
+import { 
+    getAssociatedTokenAddress, 
+    createTransferCheckedInstruction 
+} from '@solana/spl-token';
+
+// USDC Mint address string (Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr on devnet)
+const USDC_MINT_STR = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
 
 /**
  * Product interface for individual items
@@ -15,17 +29,38 @@ interface Product {
     downloadUrl?: string;
 }
 
+interface StoreMetadata {
+    name: string;
+    wallet?: string;
+    feeToggle?: boolean;
+    network?: 'mainnet-beta' | 'devnet';
+}
+
 export const ProductGrid = () => {
-    const { connected } = useWallet();
+    const { connection } = useConnection();
+    const { publicKey, connected, sendTransaction } = useWallet();
+    const [processingId, setProcessingId] = useState<string | null>(null);
+    const [purchasedIds, setPurchasedIds] = useState<string[]>([]);
 
     // URL from environment variables
     const productJsonUrl = import.meta.env.VITE_PRODUCT_JSON_URL;
+    const metadataUrl = import.meta.env.VITE_METADATA_JSON_URL;
+
+    // Fetch store metadata to get recipient wallet
+    const { data: metadata } = useQuery<StoreMetadata>({
+        queryKey: ['storeMetadata'],
+        queryFn: async () => {
+            if (!metadataUrl) return { name: 'ZeroCut Store' };
+            const response = await fetch(metadataUrl);
+            if (!response.ok) throw new Error('Failed to fetch store metadata');
+            return response.json();
+        },
+    });
 
     const { data: products, isLoading, error } = useQuery<Product[]>({
         queryKey: ['products'],
         queryFn: async () => {
             if (!productJsonUrl) {
-                // For testing/demonstration when env var is missing
                 throw new Error('VITE_PRODUCT_JSON_URL environment variable is not defined.');
             }
             const response = await fetch(productJsonUrl);
@@ -36,15 +71,65 @@ export const ProductGrid = () => {
         retry: 1,
     });
 
-    const handlePay = (product: Product) => {
-        if (!connected) return;
-        console.log(`Initial payment logic placeholder for: ${product.name}`);
-        alert(`Payment logic for ${product.name} would be triggered here. Connecting to @solana/web3.js for transaction...`);
-        // Placeholder for future implementation:
-        // 1. Create transaction (SystemProgram.transfer for SOL or Token.transfer for USDC)
-        // 2. Request signature from useWallet().sendTransaction
-        // 3. Confirm transaction
-        // 4. Reveal download link
+    const handlePay = async (product: Product) => {
+        if (!connected || !publicKey || !metadata?.wallet) {
+            alert("Please connect your wallet and ensure store is configured.");
+            return;
+        }
+
+        try {
+            setProcessingId(product.id);
+            
+            // Validate seller wallet address
+            let sellerPublicKey: PublicKey;
+            try {
+                sellerPublicKey = new PublicKey(metadata.wallet);
+            } catch (e) {
+                throw new Error("Invalid seller wallet address. Please check your metadata configuration.");
+            }
+            
+            const usdcMint = new PublicKey(USDC_MINT_STR);
+            
+            const transaction = new Transaction();
+
+            if (product.currency === 'SOL') {
+                transaction.add(
+                    SystemProgram.transfer({
+                        fromPubkey: publicKey,
+                        toPubkey: sellerPublicKey,
+                        lamports: product.price * LAMPORTS_PER_SOL,
+                    })
+                );
+            } else if (product.currency === 'USDC') {
+                const userTokenAddress = await getAssociatedTokenAddress(usdcMint, publicKey);
+                const sellerTokenAddress = await getAssociatedTokenAddress(usdcMint, sellerPublicKey);
+
+                transaction.add(
+                    createTransferCheckedInstruction(
+                        userTokenAddress,
+                        usdcMint,
+                        sellerTokenAddress,
+                        publicKey,
+                        product.price * (10 ** 6), // USDC has 6 decimals
+                        6
+                    )
+                );
+            }
+
+            const { context: { slot: minContextSlot }, value: { blockhash, lastValidBlockHeight } } =
+                await connection.getLatestBlockhashAndContext();
+
+            const signature = await sendTransaction(transaction, connection, { minContextSlot });
+
+            await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature });
+            
+            setPurchasedIds(prev => [...prev, product.id]);
+        } catch (err: any) {
+            console.error("Payment failed:", err);
+            alert(`Payment failed: ${err.message || 'Unknown error'}`);
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     // Loading state
@@ -110,23 +195,52 @@ export const ProductGrid = () => {
                             </div>
 
                             <div className="mt-auto pt-4 flex flex-col gap-4">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white">{product.price}</span>
-                                    <span className="text-xs font-bold text-brand-gray-muted uppercase tracking-wider">{product.currency}</span>
+                                <div className="flex items-baseline justify-between">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-2xl font-black text-white">{product.price}</span>
+                                        <span className="text-xs font-bold text-brand-gray-muted uppercase tracking-wider">{product.currency}</span>
+                                    </div>
+                                    {purchasedIds.includes(product.id) && (
+                                        <div className="flex items-center gap-1 text-green-400">
+                                            <CheckCircle2 size={16} />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Purchased</span>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <button
-                                    onClick={() => handlePay(product)}
-                                    disabled={!connected}
-                                    className={`
-                    w-full py-3 px-4 rounded-subtle font-bold text-sm tracking-wide transition-all duration-200
-                    ${connected
-                                            ? 'bg-white text-black hover:bg-brand-gray-light active:scale-[0.98]'
-                                            : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}
-                  `}
-                                >
-                                    {connected ? `Pay with ${product.currency}` : 'Connect Wallet to Buy'}
-                                </button>
+                                {purchasedIds.includes(product.id) ? (
+                                    <a
+                                        href={product.downloadUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full py-3 px-4 rounded-subtle bg-white text-black font-bold text-sm tracking-wide flex items-center justify-center gap-2 hover:bg-brand-gray-light transition-all active:scale-[0.98]"
+                                    >
+                                        <Download size={16} />
+                                        Download Product
+                                    </a>
+                                ) : (
+                                    <button
+                                        onClick={() => handlePay(product)}
+                                        disabled={!connected || processingId !== null}
+                                        className={`
+                                            w-full py-3 px-4 rounded-subtle font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2
+                                            ${connected
+                                                ? 'bg-white text-black hover:bg-brand-gray-light active:scale-[0.98]'
+                                                : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}
+                                        `}
+                                    >
+                                        {processingId === product.id ? (
+                                            <>
+                                                <Loader2 className="animate-spin w-4 h-4" />
+                                                Processing...
+                                            </>
+                                        ) : connected ? (
+                                            `Buy with ${product.currency}`
+                                        ) : (
+                                            'Connect Wallet to Buy'
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
