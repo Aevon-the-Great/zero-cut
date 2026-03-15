@@ -122,6 +122,53 @@ export const ProductGrid = () => {
             const signature = await sendTransaction(transaction, connection, { minContextSlot });
 
             await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature });
+
+            const parsedTx = await connection.getParsedTransaction(signature, { maxSupportedTransactionVersion: 0 });
+            if (!parsedTx) {
+                throw new Error("Transaction not found after confirmation");
+            }
+
+            if (parsedTx.meta?.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(parsedTx.meta.err)}`);
+            }
+
+            if (product.currency === 'SOL') {
+                const expectedAmount = product.price * LAMPORTS_PER_SOL;
+                const fee = parsedTx.meta?.fee || 0;
+                const expectedMin = expectedAmount - fee - 10000;
+
+                const solTransfer = parsedTx.transaction.message.instructions.find(
+                    (ix: any) => ix.program === 'system' && (ix as any).parsed?.type === 'transfer'
+                ) as any;
+
+                if (!solTransfer) {
+                    throw new Error("No SOL transfer found in transaction");
+                }
+
+                const recipient = solTransfer.parsed.info.destination || solTransfer.parsed.info.toPubkey;
+                if (recipient !== metadata.wallet) {
+                    throw new Error(`Incorrect recipient. Expected ${metadata.wallet}, got ${recipient}`);
+                }
+
+                const sentAmount = solTransfer.parsed.info.lamports;
+                if (sentAmount < expectedMin) {
+                    throw new Error(`Incorrect amount sent. Expected ~${expectedAmount}, got ${sentAmount}`);
+                }
+            } else if (product.currency === 'USDC') {
+                const tokenTransfers = parsedTx.meta?.postTokenBalances || [];
+                const sellerTokenBalance = tokenTransfers.find(
+                    (tb: any) => tb.owner === metadata.wallet && tb.mint === USDC_MINT_STR
+                );
+
+                if (!sellerTokenBalance) {
+                    throw new Error("No USDC transfer found in transaction");
+                }
+
+                const receivedAmount = sellerTokenBalance.uiTokenAmount?.uiAmountString;
+                if (receivedAmount !== undefined && Number(receivedAmount) < product.price - 1) {
+                    throw new Error(`Incorrect amount sent. Expected ~${product.price}, got ${receivedAmount}`);
+                }
+            }
             
             setPurchasedIds(prev => [...prev, product.id]);
         } catch (err: any) {

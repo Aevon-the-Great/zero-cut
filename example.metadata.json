@@ -1,6 +1,0 @@
-{
-    "name": "ZeroCut Store",
-    "wallet": "YOUR_SOLANA_WALLET_ADDRESS_HERE",
-    "feeToggle": false,
-    "network": "devnet"
-}

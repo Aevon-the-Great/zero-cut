@@ -1,73 +1,79 @@
-# React + TypeScript + Vite
+# ZeroCut
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**The anti-Gumroad. Sell digital files direct in crypto. No middleman. No tax. Keep 100%.**
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What It Is
 
-## React Compiler
+ZeroCut is a frontend-only store protocol for creators who want full ownership. Fork the repo, drop in your product JSON, set your wallet address, deploy somewhere (Cloudflare Pages, Vercel, Arweave — whatever). Buyers pay you in SOL, the transaction confirms on Solana, and the download link unlocks instantly. No backend. No platform fees. No gatekeepers.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+It's built for creators who don't want to hand over 30% to Gumroad or deal with Stripe's "your account has been restricted" emails. If you can edit a JSON file and push to GitHub, you can run your own store.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## The Raw Deal
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Let's be real about what you're getting:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Links aren't secret.** Once the transaction confirms, the download URL sits in the frontend. Anyone who pokes around your config or sniffs the JSON can grab the link. No DRM in v1. If someone's determined, they can pirate it.
+- **No refunds.** It's direct wallet-to-wallet. If you ghost after someone pays, there's no chargeback. The buyer is trusting you. Don't be that person.
+- **Crypto only.** Fiat? Convert it yourself.
+- **RPC delays happen.** Solana's fast, but not magic. Sometimes RPC nodes lag. If the UI says "pending" for 30 seconds, just wait or check your wallet.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+This is P2P. It respects your freedom and assumes you're not a scammer. Act accordingly.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Quick Start
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. **Fork the repo**
+2. **Edit your config** — set `VITE_PRODUCT_JSON_URL`
+`VITE_METADATA_JSON_URL`
+3. **Drop your product data** in your json file (or host it somewhere and point to it)
+4. **Run it locally:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+5. **Deploy** — push to Cloudflare Pages, Vercel, Arweave, or any static host. That's it.
+
+---
+
+## Full Docs
+
+Detailed setup guide, config options, deployment tips, and troubleshooting:
+
+**[ZeroCut Wiki →](https://github.com/yourusername/ZeroCut/wiki)**
+
+---
+
+## Want to Contribute?
+
+Yeah, we could use help. Here's where it gets interesting:
+
+- **Encryption / gated downloads** — thinking Lit Protocol or client-side encryption to actually hide the link
+- **Multi-chain** — extend to Ethereum, Base, Solana (already here), whatever
+- **Better fiat on-ramps** — make the "convert to crypto" step less painful
+- **Bulk upload, discount codes, analytics** — stuff Gumroad does that we'd rather build ourselves
+
+Open an issue. Submit a PR. If you ship something clean, we'll shout it out.
+
+Bounties? Maybe eventually. For now, DM me on Discord- "y.u.r.e.i.d.r.e.a.m.s" if you build something cool.
+
+---
+
+## License
+
+MIT — do whatever, just don't blame us if things break.
+
+---
+
+Built by **Aevon**, a random dev from India.
+
+**Discord:** "y.u.r.e.i.d.r.e.a.m.s"
+**Site:** [Aevon](https://aevon.pages.dev)
+
+---
+
+Fork it. Sell shit. Keep the bag. Simple.

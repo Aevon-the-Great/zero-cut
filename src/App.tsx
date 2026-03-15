@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StoreHeader from './components/StoreHeader';
 import ProductGrid from './components/ProductGrid';
+import DisclaimerModal from './components/DisclaimerModal';
 
 const queryClient = new QueryClient();
 
@@ -9,6 +10,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-black transition-colors duration-500">
         <StoreHeader />
+        
+        <DisclaimerModal />
 
         <main className="pt-24 pb-20">
           <div className="max-w-7xl mx-auto px-6 md:px-12 mb-12">
