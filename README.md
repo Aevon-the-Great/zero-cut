@@ -44,7 +44,7 @@ This is P2P. It respects your freedom and assumes you're not a scammer. Act acco
 
 Detailed setup guide, config options, deployment tips, and troubleshooting:
 
-**[ZeroCut Wiki →](https://github.com/yourusername/ZeroCut/wiki)**
+**[ZeroCut Wiki →](https://zero-cut.pages.dev/)**
 
 ---
 
