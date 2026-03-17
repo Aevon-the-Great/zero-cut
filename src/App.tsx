@@ -34,7 +34,7 @@ function App() {
               <span className="text-[10px] bg-white/10 text-white/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">v1.0-alpha</span>
             </div>
             <p className="text-brand-gray-muted text-sm">
-              &copy; 2024 ZeroCut. Open-source under MIT.
+              &copy; 2026 ZeroCut. Open-source under MIT.
             </p>
           </div>
         </footer>
