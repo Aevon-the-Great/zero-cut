@@ -23,8 +23,8 @@ interface Product {
     id: string;
     name: string;
     description: string;
-    price: number; // In SOL or USDC
-    currency: 'SOL' | 'USDC';
+    price: number; 
+    currency: 'SOL' | 'USDC' | 'USD';
     image?: string;
     downloadUrl?: string;
 }
@@ -71,6 +71,27 @@ export const ProductGrid = () => {
         retry: 1,
     });
 
+    // Fetch SOL price in USD from Binance with Kraken as fallback
+    const { data: solPrice } = useQuery<number>({
+        queryKey: ['solPrice'],
+        queryFn: async () => {
+            try {
+                const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT');
+                if (!response.ok) throw new Error('Binance API failed');
+                const data = await response.json();
+                return parseFloat(data.price);
+            } catch (err) {
+                console.warn('Binance API failed, trying Kraken...', err);
+                const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=SOLUSD');
+                if (!response.ok) throw new Error('Kraken API failed');
+                const data = await response.json();
+                // Kraken response structure result.SOLUSD.a[0] is ask price
+                return parseFloat(data.result.SOLUSD.a[0] || data.result.XSOLZUSD.a[0]);
+            }
+        },
+        refetchInterval: 60000, // Update every minute
+    });
+
     const handlePay = async (product: Product) => {
         if (!connected || !publicKey || !metadata?.wallet) {
             alert("Please connect your wallet and ensure store is configured.");
@@ -88,8 +109,12 @@ export const ProductGrid = () => {
                 throw new Error("Invalid seller wallet address. Please check your metadata configuration.");
             }
             
+            const currentSolPrice = solPrice;
+            if (product.currency === 'USD' && !currentSolPrice) {
+                throw new Error("Currency price data is currently unavailable. Please try again in moments.");
+            }
+
             const usdcMint = new PublicKey(USDC_MINT_STR);
-            
             const transaction = new Transaction();
 
             if (product.currency === 'SOL') {
@@ -97,7 +122,16 @@ export const ProductGrid = () => {
                     SystemProgram.transfer({
                         fromPubkey: publicKey,
                         toPubkey: sellerPublicKey,
-                        lamports: product.price * LAMPORTS_PER_SOL,
+                        lamports: Math.round(product.price * LAMPORTS_PER_SOL),
+                    })
+                );
+            } else if (product.currency === 'USD') {
+                const solAmount = product.price / currentSolPrice!;
+                transaction.add(
+                    SystemProgram.transfer({
+                        fromPubkey: publicKey,
+                        toPubkey: sellerPublicKey,
+                        lamports: Math.floor(solAmount * LAMPORTS_PER_SOL),
                     })
                 );
             } else if (product.currency === 'USDC') {
@@ -110,7 +144,7 @@ export const ProductGrid = () => {
                         usdcMint,
                         sellerTokenAddress,
                         publicKey,
-                        product.price * (10 ** 6), // USDC has 6 decimals
+                        Math.round(product.price * (10 ** 6)), // USDC has 6 decimals
                         6
                     )
                 );
@@ -132,10 +166,14 @@ export const ProductGrid = () => {
                 throw new Error(`Transaction failed: ${JSON.stringify(parsedTx.meta.err)}`);
             }
 
-            if (product.currency === 'SOL') {
-                const expectedAmount = product.price * LAMPORTS_PER_SOL;
+            if (product.currency === 'SOL' || product.currency === 'USD') {
+                const expectedSolAmount = product.currency === 'SOL' 
+                    ? product.price 
+                    : (product.price / currentSolPrice!);
+                
+                const expectedLamports = expectedSolAmount * LAMPORTS_PER_SOL;
                 const fee = parsedTx.meta?.fee || 0;
-                const expectedMin = expectedAmount - fee - 10000;
+                const expectedMin = expectedLamports - fee - 10000;
 
                 const solTransfer = parsedTx.transaction.message.instructions.find(
                     (ix: any) => ix.program === 'system' && (ix as any).parsed?.type === 'transfer'
@@ -152,7 +190,7 @@ export const ProductGrid = () => {
 
                 const sentAmount = solTransfer.parsed.info.lamports;
                 if (sentAmount < expectedMin) {
-                    throw new Error(`Incorrect amount sent. Expected ~${expectedAmount}, got ${sentAmount}`);
+                    throw new Error(`Incorrect amount sent. Expected ~${Math.floor(expectedLamports)}, got ${sentAmount}`);
                 }
             } else if (product.currency === 'USDC') {
                 const tokenTransfers = parsedTx.meta?.postTokenBalances || [];
@@ -243,9 +281,30 @@ export const ProductGrid = () => {
 
                             <div className="mt-auto pt-4 flex flex-col gap-4">
                                 <div className="flex items-baseline justify-between">
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-2xl font-black text-white">{product.price}</span>
-                                        <span className="text-xs font-bold text-brand-gray-muted uppercase tracking-wider">{product.currency}</span>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-2xl font-black text-white">
+                                                {product.currency === 'SOL' 
+                                                    ? (solPrice ? `$${(product.price * solPrice).toFixed(2)}` : product.price)
+                                                    : `$${product.price.toFixed(2)}`
+                                                }
+                                            </span>
+                                            <span className="text-xs font-bold text-brand-gray-muted uppercase tracking-wider">
+                                                {product.currency === 'SOL' && !solPrice ? 'SOL' : 'USD'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[10px] text-brand-gray-muted font-bold uppercase tracking-widest">
+                                                {product.currency === 'USD' && solPrice 
+                                                    ? `≈ ${(product.price / solPrice).toFixed(4)} SOL` 
+                                                    : product.currency === 'SOL' && solPrice
+                                                        ? `= ${product.price} SOL`
+                                                        : product.currency === 'USDC'
+                                                            ? 'via USDC'
+                                                            : ''
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
                                     {purchasedIds.includes(product.id) && (
                                         <div className="flex items-center gap-1 text-green-400">
@@ -282,7 +341,7 @@ export const ProductGrid = () => {
                                                 Processing...
                                             </>
                                         ) : connected ? (
-                                            `Buy with ${product.currency}`
+                                            `Buy with ${product.currency === 'USD' ? 'SOL' : product.currency}`
                                         ) : (
                                             'Connect Wallet to Buy'
                                         )}
